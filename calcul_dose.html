@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculateur de dose cumulée</title>
+<style>
+  :root{
+    --bg: #0f1416;
+    --panel: #161d20;
+    --panel-2: #1c2528;
+    --line: #2a3538;
+    --text: #e8edee;
+    --muted: #7d9096;
+    --accent: #ff8a3d;
+    --accent-dim: #5c3a20;
+    --mono: 'IBM Plex Mono','SFMono-Regular',Consolas,monospace;
+    --sans: 'IBM Plex Sans',-apple-system,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:32px 16px 80px;
+  }
+  .wrap{max-width:720px;margin:0 auto;}
+
+  header{margin-bottom:28px;}
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent);
+    margin-bottom:8px;
+  }
+  h1{
+    font-size:26px;
+    font-weight:600;
+    margin:0 0 6px;
+    letter-spacing:-.01em;
+  }
+  .sub{color:var(--muted);font-size:14px;line-height:1.5;}
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:16px;
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns:1fr 1fr 90px auto;
+    gap:10px;
+    align-items:end;
+  }
+  @media (max-width:560px){
+    .row{grid-template-columns:1fr 1fr; grid-template-areas:"kv mas" "n btn";}
+    .row > *:nth-child(1){grid-area:kv;}
+    .row > *:nth-child(2){grid-area:mas;}
+    .row > *:nth-child(3){grid-area:n;}
+    .row > *:nth-child(4){grid-area:btn;}
+  }
+
+  label{
+    display:block;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  select, input{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:15px;
+    padding:10px 10px;
+    border-radius:6px;
+    outline:none;
+  }
+  select:focus, input:focus{border-color:var(--accent);}
+
+  .presets{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  button.preset{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    font-family:var(--mono);
+    font-size:13px;
+    padding:8px 14px;
+    border-radius:20px;
+    cursor:pointer;
+    transition:border-color .15s, color .15s;
+  }
+  button.preset:hover{border-color:var(--accent);color:var(--accent);}
+  button.preset .tag{
+    color:var(--muted);
+    font-size:11px;
+    margin-left:6px;
+  }
+  button.preset:hover .tag{color:var(--accent);}
+
+  .dose-hint{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--muted);
+    margin-top:8px;
+  }
+  .dose-hint b{color:var(--accent);font-weight:600;}
+
+  button.add{
+    background:var(--accent);
+    color:#20140a;
+    border:none;
+    font-family:var(--mono);
+    font-weight:600;
+    font-size:14px;
+    padding:11px 14px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:filter .15s;
+  }
+  button.add:hover{filter:brightness(1.08);}
+  button.add:active{filter:brightness(0.92);}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    font-family:var(--mono);
+    font-size:14px;
+  }
+  thead th{
+    text-align:left;
+    font-size:11px;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:500;
+    padding:0 8px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  tbody td{
+    padding:10px 8px;
+    border-bottom:1px solid var(--line);
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;}
+  td.del{text-align:right;}
+  .del button{
+    background:none;
+    border:1px solid var(--line);
+    color:var(--muted);
+    font-family:var(--mono);
+    font-size:12px;
+    padding:4px 9px;
+    border-radius:5px;
+    cursor:pointer;
+  }
+  .del button:hover{border-color:#c0483a;color:#e07868;}
+
+  .empty{
+    color:var(--muted);
+    font-size:14px;
+    font-family:var(--mono);
+    padding:18px 0;
+    text-align:center;
+  }
+
+  .total{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    padding-top:16px;
+    margin-top:6px;
+    border-top:1px solid var(--line);
+  }
+  .total .label{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .total .value{
+    font-family:var(--mono);
+    font-size:30px;
+    font-weight:600;
+    color:var(--accent);
+    letter-spacing:-.01em;
+  }
+  .total .value span{font-size:15px;color:var(--muted);font-weight:400;margin-left:6px;}
+
+  .reset-line{
+    text-align:right;
+    margin-top:10px;
+  }
+  .reset-line button{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-family:var(--mono);
+    font-size:12px;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+  }
+  .reset-line button:hover{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Radiologie — cumul de dose</div>
+    <h1>Calculateur de dose cumulée</h1>
+    <div class="sub">Sélectionne le kV, le mAs et le nombre de clichés pour chaque série d'exposition. Le total s'additionne automatiquement.</div>
+  </header>
+
+  <div class="panel">
+    <div class="presets" id="presets"></div>
+    <div class="row">
+      <div>
+        <label for="kv">kV</label>
+        <select id="kv"></select>
+      </div>
+      <div>
+        <label for="mas">mAs</label>
+        <select id="mas"></select>
+      </div>
+      <div>
+        <label for="n">Clichés</label>
+        <input id="n" type="number" min="1" step="1" value="1">
+      </div>
+      <button class="add" onclick="addEntry()">Ajouter</button>
+    </div>
+    <div class="dose-hint" id="hint"></div>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>kV</th>
+          <th>mAs</th>
+          <th style="text-align:right">Clichés</th>
+          <th style="text-align:right">Dose unit.</th>
+          <th style="text-align:right">Sous-total</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="emptyMsg">Aucune série ajoutée pour l'instant.</div>
+
+    <div class="total">
+      <div class="label">Dose totale</div>
+      <div class="value" id="totalValue">0.0<span>µGy·m²</span></div>
+    </div>
+    <div class="reset-line">
+      <button onclick="resetAll()">Tout effacer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Table de référence : kV -> { mAs: dose en µGy·m² }
+const DOSE_TABLE = {
+  60: {1.25:3.7, 1.6:5, 2:6.2, 2.5:7.9},
+  70: {1.25:5.5, 1.6:7.3, 2.5:11.8, 3.2:15.1},
+  75: {2.5:13.9, 3.2:17.9, 4:22.4, 5:27.9, 6.4:36.1, 8:53.1, 10:56.6, 12.5:71.2},
+  85: {4:29.4, 5:37.1, 6.4:47.4, 8:59.4, 10:74.7, 12.5:93.4},
+  90: {1:7.5, 1.25:10, 1.6:13, 2:16.2, 2.5:20.7, 3.2:26.5, 4:33.1}
+};
+
+const PRESETS = [
+  {label:'RP', kv:90, mas:1},
+  {label:'Bassin', kv:90, mas:2.5},
+  {label:'Genou', kv:70, mas:1.6}
+];
+
+const kvSelect = document.getElementById('kv');
+const masSelect = document.getElementById('mas');
+const nInput = document.getElementById('n');
+const hint = document.getElementById('hint');
+const rowsBody = document.getElementById('rows');
+const emptyMsg = document.getElementById('emptyMsg');
+const totalValue = document.getElementById('totalValue');
+const presetsBar = document.getElementById('presets');
+
+let entries = [];
+
+function populatePresets(){
+  presetsBar.innerHTML = '';
+  PRESETS.forEach(p=>{
+    const btn = document.createElement('button');
+    btn.className = 'preset';
+    btn.innerHTML = `${p.label}<span class="tag">${p.kv}kV / ${p.mas}mAs</span>`;
+    btn.onclick = () => applyPreset(p);
+    presetsBar.appendChild(btn);
+  });
+}
+
+function applyPreset(p){
+  kvSelect.value = p.kv;
+  populateMas();
+  masSelect.value = p.mas;
+  updateHint();
+}
+
+function populateKv(){
+  Object.keys(DOSE_TABLE)
+    .map(Number)
+    .sort((a,b)=>a-b)
+    .forEach(kv=>{
+      const opt = document.createElement('option');
+      opt.value = kv;
+      opt.textContent = kv;
+      kvSelect.appendChild(opt);
+    });
+  populateMas();
+}
+
+function populateMas(){
+  masSelect.innerHTML = '';
+  const kv = kvSelect.value;
+  Object.keys(DOSE_TABLE[kv])
+    .map(Number)
+    .sort((a,b)=>a-b)
+    .forEach(mas=>{
+      const opt = document.createElement('option');
+      opt.value = mas;
+      opt.textContent = mas;
+      masSelect.appendChild(opt);
+    });
+  updateHint();
+}
+
+function currentDose(){
+  const kv = kvSelect.value;
+  const mas = masSelect.value;
+  return DOSE_TABLE[kv][mas];
+}
+
+function updateHint(){
+  const dose = currentDose();
+  const n = Math.max(1, parseInt(nInput.value) || 1);
+  hint.innerHTML = `Dose unitaire : <b>${dose}</b> µGy·m²  ·  × ${n} = <b>${(dose*n).toFixed(1)}</b> µGy·m²`;
+}
+
+kvSelect.addEventListener('change', populateMas);
+masSelect.addEventListener('change', updateHint);
+nInput.addEventListener('input', updateHint);
+
+function addEntry(){
+  const kv = kvSelect.value;
+  const mas = masSelect.value;
+  const n = Math.max(1, parseInt(nInput.value) || 1);
+  const unit = currentDose();
+  const subtotal = unit * n;
+  entries.push({kv, mas, n, unit, subtotal});
+  render();
+}
+
+function removeEntry(i){
+  entries.splice(i,1);
+  render();
+}
+
+function resetAll(){
+  entries = [];
+  render();
+}
+
+function render(){
+  rowsBody.innerHTML = '';
+  if(entries.length === 0){
+    emptyMsg.style.display = 'block';
+  } else {
+    emptyMsg.style.display = 'none';
+    entries.forEach((e,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${e.kv}</td>
+        <td>${e.mas}</td>
+        <td class="num">${e.n}</td>
+        <td class="num">${e.unit}</td>
+        <td class="num">${e.subtotal.toFixed(1)}</td>
+        <td class="del"><button onclick="removeEntry(${i})">retirer</button></td>
+      `;
+      rowsBody.appendChild(tr);
+    });
+  }
+  const total = entries.reduce((s,e)=>s+e.subtotal, 0);
+  totalValue.innerHTML = `${total.toFixed(1)}<span>µGy·m²</span>`;
+}
+
+populateKv();
+populatePresets();
+render();
+</script>
+</body>
+</html>
